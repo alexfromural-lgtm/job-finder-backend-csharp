@@ -10,7 +10,6 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 using StackExchange.Redis;
 using FluentValidation;
-using JobFinder.Api.Common.Models;
 using JobFinder.Api.Config;
 using JobFinder.Api.Data;
 using JobFinder.Api.Middleware;
@@ -18,6 +17,9 @@ using JobFinder.Api.Queue;
 using JobFinder.Api.Services;
 using JobFinder.Api.Utils;
 using JobFinder.Api.Validators;
+using JobFinder.Api.Common.Models;
+// Alias to avoid ambiguity with StackExchange.Redis.Role
+using AppModels = JobFinder.Api.Common.Models;
 
 namespace JobFinder.Api
 {
@@ -56,15 +58,14 @@ namespace JobFinder.Api
             // 3. Register EF Core DbContext with Npgsql & snake_case naming (matches Prisma schema conventions)
             var dataSourceBuilder = new NpgsqlDataSourceBuilder(envConfig.DatabaseUrl);
             // Register Npgsql enum mappings with explicit PostgreSQL names matching Prisma schema
-            dataSourceBuilder.MapEnum<Role>("Role");
-            dataSourceBuilder.MapEnum<ApplicationStatus>("ApplicationStatus");
-            dataSourceBuilder.MapEnum<NotificationType>("NotificationType");
-            dataSourceBuilder.MapEnum<ReportStatus>("ReportStatus");
+            dataSourceBuilder.MapEnum<AppModels.Role>("Role");
+            dataSourceBuilder.MapEnum<AppModels.ApplicationStatus>("ApplicationStatus");
+            dataSourceBuilder.MapEnum<AppModels.NotificationType>("NotificationType");
+            dataSourceBuilder.MapEnum<AppModels.ReportStatus>("ReportStatus");
             var dataSource = dataSourceBuilder.Build();
 
             builder.Services.AddDbContext<JobFinderDbContext>(options =>
-                options.UseNpgsql(dataSource)
-                       .UseSnakeCaseNamingConventions());
+                options.UseNpgsql(dataSource));
 
             // 4. Register StackExchange.Redis
             builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
@@ -122,17 +123,17 @@ namespace JobFinder.Api
                 return;
             }
 
-            // 10. Automatically run migrations on normal startup for ease of development
+            // 10. Automatically ensure database schema is created on normal startup
             try
             {
                 using var scope = app.Services.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<JobFinderDbContext>();
-                await context.Database.MigrateAsync();
-                Console.WriteLine("✅ Database migrated successfully.");
+                await SeedData.EnsureDatabaseSchemaAsync(context);
+                Console.WriteLine("✅ Database schema initialized successfully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Database migration on startup failed: {ex.Message}");
+                Console.WriteLine($"⚠️ Database schema initialization failed: {ex.Message}");
             }
 
             // 11. Middlewares setup

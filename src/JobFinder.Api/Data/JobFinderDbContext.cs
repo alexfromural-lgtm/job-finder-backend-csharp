@@ -177,6 +177,28 @@ namespace JobFinder.Api.Data
                     .HasForeignKey(r => r.ReportedJobId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
+
+            // ── Prisma-compatible naming convention ──────────────────────────────────
+            // Prisma for PostgreSQL uses:
+            //   - Table names: singular PascalCase  (e.g. "User", "JobSeekerProfile")
+            //   - Column names: camelCase           (e.g. "isActive", "createdAt")
+            // EF Core defaults to plural DbSet names for tables and PascalCase for columns,
+            // so we apply the convention manually here instead of using an external package.
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                // Table name = C# class name (singular PascalCase)
+                entityType.SetTableName(entityType.ClrType.Name);
+
+                // Column names: PascalCase → camelCase (first letter lowercase)
+                foreach (var property in entityType.GetProperties())
+                {
+                    var col = property.GetColumnName();
+                    if (!string.IsNullOrEmpty(col) && char.IsUpper(col[0]))
+                    {
+                        property.SetColumnName(char.ToLower(col[0]) + col[1..]);
+                    }
+                }
+            }
         }
     }
 }

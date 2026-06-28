@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: job-finder-backend
+    container_name: job-finder-backend-csharp
     restart: unless-stopped
     ports:
       - "5002:5002"             # Same as Node.js backend — Vite proxy targets localhost:5002
@@ -33,7 +33,7 @@ services:
   # ── PostgreSQL Database ───────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: job-finder-db
+    container_name: job-finder-db-csharp
     restart: unless-stopped
     ports:
       - "5432:5432"             # Same as Node.js backend
@@ -57,7 +57,7 @@ services:
   # ── pgAdmin ───────────────────────────────────────────────────────────────────
   pgadmin:
     image: dpage/pgadmin4
-    container_name: job-finder-pgadmin
+    container_name: job-finder-pgadmin-csharp
     restart: unless-stopped
     ports:
       - "5050:80"               # Same as Node.js backend
@@ -74,7 +74,7 @@ services:
   # ── Redis Message Queue ────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: job-finder-redis
+    container_name: job-finder-redis-csharp
     restart: unless-stopped
     ports:
       - "6379:6379"             # Same as Node.js backend

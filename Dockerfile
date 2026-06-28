@@ -10,7 +10,6 @@ RUN dotnet restore ./src/JobFinder.Api/JobFinder.Api.csproj
 COPY src/ ./src/
 RUN dotnet publish ./src/JobFinder.Api/JobFinder.Api.csproj \
     --configuration Release \
-    --no-restore \
     --output /app/publish
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────

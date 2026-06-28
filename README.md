@@ -54,6 +54,14 @@ docker compose up --build
 docker compose exec backend dotnet JobFinder.Api.dll --seed
 ```
 
+This creates demo users:
+| Email | Password | Role |
+|-------|----------|------|
+| `admin@example1.com` | `admin` | ADMIN |
+| `recruiter@example.com` | `recruiter123` | RECRUITER |
+| `seeker@example.com` | `seeker123` | JOB_SEEKER |
+
+
 The React frontend (`job-finder-react`) can now be started without any changes:
 
 ```bash
