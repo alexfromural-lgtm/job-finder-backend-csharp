@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using JobFinder.Api.Common.Models;
 using JobFinder.Api.Data.Entities;
 
@@ -11,46 +9,27 @@ namespace JobFinder.Api.Data
 {
     public static class SeedData
     {
+        /// <summary>
+        /// Applies any pending EF Core migrations (creates the DB if needed).
+        /// Safe to call on every startup — MigrateAsync is idempotent.
+        /// </summary>
         public static async Task EnsureDatabaseSchemaAsync(JobFinderDbContext context)
         {
-            var databaseCreator = context.Database.GetService<IDatabaseCreator>() as RelationalDatabaseCreator;
-            if (databaseCreator != null)
-            {
-                if (!await databaseCreator.ExistsAsync())
-                {
-                    await databaseCreator.CreateAsync();
-                }
-
-                bool tablesExist = false;
-                try
-                {
-                    await context.Users.AnyAsync();
-                    tablesExist = true;
-                }
-                catch
-                {
-                    // Tables do not exist
-                }
-
-                if (!tablesExist)
-                {
-                    await databaseCreator.CreateTablesAsync();
-                    Console.WriteLine("✅ Database schema initialized and tables created.");
-                }
-            }
+            await context.Database.MigrateAsync();
+            Console.WriteLine("✅ EF Core migrations applied successfully.");
         }
 
+        /// <summary>
+        /// Clears all tables and repopulates them with representative seed data.
+        /// </summary>
         public static async Task InitializeAsync(JobFinderDbContext context)
         {
             Console.WriteLine("🌱 Starting database seed...");
 
-            // Ensure database is created and schema is initialized
+            // Apply migrations before seeding
             await EnsureDatabaseSchemaAsync(context);
 
-            // Check if database is already seeded (avoid double-seeding if we just want a simple check,
-            // but prisma/seed.ts cleans up first, so let's do the same for a fresh seed experience)
-            
-            // Clean up existing data for a fresh seed
+            // Clean up existing data for a fresh seed (same order as Prisma seed.ts)
             context.Reports.RemoveRange(context.Reports);
             context.Notifications.RemoveRange(context.Notifications);
             context.SavedJobs.RemoveRange(context.SavedJobs);

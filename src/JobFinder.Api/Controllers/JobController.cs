@@ -34,7 +34,7 @@ namespace JobFinder.Api.Controllers
 
             var userId = User.FindFirst("userId")!.Value;
             var job = await _jobService.CreateJobAsync(userId, dto);
-            return StatusCode(201, job);
+            return StatusCode(201, new { job });
         }
 
         [HttpGet("{jobId}")]
@@ -46,7 +46,7 @@ namespace JobFinder.Api.Controllers
                 return NotFound(new { error = "Job not found" });
             }
 
-            return Ok(job);
+            return Ok(new { job });
         }
 
         [HttpPatch("{jobId}")]
@@ -61,7 +61,7 @@ namespace JobFinder.Api.Controllers
 
             var userId = User.FindFirst("userId")!.Value;
             var job = await _jobService.UpdateJobAsync(jobId, userId, dto);
-            return Ok(job);
+            return Ok(new { job });
         }
 
         [HttpDelete("{jobId}")]
@@ -79,7 +79,7 @@ namespace JobFinder.Api.Controllers
         {
             var userId = User.FindFirst("userId")!.Value;
             var jobs = await _jobService.GetJobsByRecruiterAsync(userId);
-            return Ok(jobs);
+            return Ok(new { jobs });
         }
 
         // GET /api/jobs/all  — public job listing with filters (matches Node.js route exactly)

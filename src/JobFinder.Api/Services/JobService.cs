@@ -155,10 +155,13 @@ namespace JobFinder.Api.Services
             return new JobSearchResultDto
             {
                 Jobs = jobDtos,
-                Total = total,
-                Page = currentPage,
-                PageSize = currentPageSize,
-                TotalPages = (int)Math.Ceiling((double)total / currentPageSize)
+                Meta = new JobsMetaDto
+                {
+                    Total = total,
+                    Page = currentPage,
+                    PageSize = currentPageSize,
+                    TotalPages = (int)Math.Ceiling((double)total / currentPageSize)
+                }
             };
         }
 

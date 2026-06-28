@@ -55,17 +55,19 @@ namespace JobFinder.Api
                 options.ListenAnyIP(envConfig.Port);
             });
 
-            // 3. Register EF Core DbContext with Npgsql & snake_case naming (matches Prisma schema conventions)
-            var dataSourceBuilder = new NpgsqlDataSourceBuilder(envConfig.DatabaseUrl);
-            // Register Npgsql enum mappings with explicit PostgreSQL names matching Prisma schema
-            dataSourceBuilder.MapEnum<AppModels.Role>("Role");
-            dataSourceBuilder.MapEnum<AppModels.ApplicationStatus>("ApplicationStatus");
-            dataSourceBuilder.MapEnum<AppModels.NotificationType>("NotificationType");
-            dataSourceBuilder.MapEnum<AppModels.ReportStatus>("ReportStatus");
-            var dataSource = dataSourceBuilder.Build();
-
+            // 3. Register EF Core DbContext with Npgsql
+            // Registering enums inside UseNpgsql options ensures the EF Core migrations
+            // tool detects the mapped enums at design-time and generates the correct
+            // PostgreSQL enum column types instead of falling back to integers.
+            var prismaTranslator = NpgsqlPrismaNameTranslator.Instance;
             builder.Services.AddDbContext<JobFinderDbContext>(options =>
-                options.UseNpgsql(dataSource));
+                options.UseNpgsql(envConfig.DatabaseUrl, npgsqlOptions =>
+                {
+                    npgsqlOptions.MapEnum<AppModels.Role>(nameTranslator: prismaTranslator);
+                    npgsqlOptions.MapEnum<AppModels.ApplicationStatus>(nameTranslator: prismaTranslator);
+                    npgsqlOptions.MapEnum<AppModels.NotificationType>(nameTranslator: prismaTranslator);
+                    npgsqlOptions.MapEnum<AppModels.ReportStatus>(nameTranslator: prismaTranslator);
+                }));
 
             // 4. Register StackExchange.Redis
             builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
@@ -123,7 +125,7 @@ namespace JobFinder.Api
                 return;
             }
 
-            // 10. Automatically ensure database schema is created on normal startup
+            // 10. Apply pending EF Core migrations automatically on startup (idempotent)
             try
             {
                 using var scope = app.Services.CreateScope();
@@ -155,7 +157,12 @@ namespace JobFinder.Api
                 var parts = line.Split('=', 2);
                 if (parts.Length == 2)
                 {
-                    Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
+                    var key = parts[0].Trim();
+                    // Only set if not already set — shell/Docker env vars take priority over .env file
+                    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+                    {
+                        Environment.SetEnvironmentVariable(key, parts[1].Trim());
+                    }
                 }
             }
         }

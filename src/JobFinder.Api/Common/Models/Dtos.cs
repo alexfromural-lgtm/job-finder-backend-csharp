@@ -152,6 +152,11 @@ namespace JobFinder.Api.Common.Models
     public class JobSearchResultDto
     {
         public List<JobResponseDto> Jobs { get; set; } = new();
+        public JobsMetaDto Meta { get; set; } = new();
+    }
+
+    public class JobsMetaDto
+    {
         public int Total { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }

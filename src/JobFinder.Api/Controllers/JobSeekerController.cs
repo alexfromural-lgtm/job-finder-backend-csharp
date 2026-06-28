@@ -75,8 +75,8 @@ namespace JobFinder.Api.Controllers
 
             return Accepted(new
             {
-                message = "Application submission in progress",
-                jobId = queueJob.Id
+                queueJobId = queueJob.Id,
+                status = "queued"
             });
         }
 
@@ -94,8 +94,8 @@ namespace JobFinder.Api.Controllers
 
             return Accepted(new
             {
-                message = "Job save in progress",
-                jobId = queueJob.Id
+                queueJobId = queueJob.Id,
+                status = "queued"
             });
         }
 

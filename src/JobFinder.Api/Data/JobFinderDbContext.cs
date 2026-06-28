@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using JobFinder.Api.Common.Models;
 using JobFinder.Api.Data.Entities;
+using JobFinder.Api.Utils;
 
 namespace JobFinder.Api.Data
 {
@@ -15,7 +16,7 @@ namespace JobFinder.Api.Data
 
         /// <summary>
         /// Automatically stamps UpdatedAt on any entity that has that property
-        /// before saving, matching Prisma's @updatedAt decorator behavior.
+        /// before saving, mirroring Prisma's @updatedAt decorator behavior.
         /// </summary>
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
@@ -49,39 +50,37 @@ namespace JobFinder.Api.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Register PostgreSQL Enums — names must match the Prisma-generated enum type names exactly
-            modelBuilder.HasPostgresEnum<Role>("public", "Role");
-            modelBuilder.HasPostgresEnum<ApplicationStatus>("public", "ApplicationStatus");
-            modelBuilder.HasPostgresEnum<NotificationType>("public", "NotificationType");
-            modelBuilder.HasPostgresEnum<ReportStatus>("public", "ReportStatus");
+            // ── Enum registration ─────────────────────────────────────────────────────
+            // NpgsqlPrismaNameTranslator keeps enum TYPE names as PascalCase ("Role")
+            // and lowercases enum LABELS ("recruiter", "job_seeker") to match Prisma's
+            // PostgreSQL enum conventions.
+            var prismaTranslator = NpgsqlPrismaNameTranslator.Instance;
+            modelBuilder.HasPostgresEnum<Role>(nameTranslator: prismaTranslator);
+            modelBuilder.HasPostgresEnum<ApplicationStatus>(nameTranslator: prismaTranslator);
+            modelBuilder.HasPostgresEnum<NotificationType>(nameTranslator: prismaTranslator);
+            modelBuilder.HasPostgresEnum<ReportStatus>(nameTranslator: prismaTranslator);
 
-            // User configuration
+            // ── User ─────────────────────────────────────────────────────────────────
+            // Table name and column names are set via [Table] / [Column] data annotations.
             modelBuilder.Entity<User>(entity =>
             {
-                entity.HasKey(u => u.Id);
                 entity.HasIndex(u => u.Email).IsUnique();
-                entity.Property(u => u.Name).IsRequired();
-                entity.Property(u => u.Email).IsRequired();
-                entity.Property(u => u.Password).IsRequired();
-                entity.Property(u => u.Roles).IsRequired(); // List<Role> mapped to Role[]
             });
 
-            // JobSeekerProfile configuration (One-to-One with User)
+            // ── JobSeekerProfile (One-to-One with User) ───────────────────────────────
             modelBuilder.Entity<JobSeekerProfile>(entity =>
             {
-                entity.HasKey(jsp => jsp.Id);
                 entity.HasIndex(jsp => jsp.UserId).IsUnique();
-                
+
                 entity.HasOne(jsp => jsp.User)
                     .WithOne(u => u.JobSeeker)
                     .HasForeignKey<JobSeekerProfile>(jsp => jsp.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // RecruiterProfile configuration (One-to-One with User)
+            // ── RecruiterProfile (One-to-One with User) ────────────────────────────────
             modelBuilder.Entity<RecruiterProfile>(entity =>
             {
-                entity.HasKey(rp => rp.Id);
                 entity.HasIndex(rp => rp.UserId).IsUnique();
 
                 entity.HasOne(rp => rp.User)
@@ -90,12 +89,10 @@ namespace JobFinder.Api.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Job configuration
+            // ── Job ───────────────────────────────────────────────────────────────────
             modelBuilder.Entity<Job>(entity =>
             {
-                entity.HasKey(j => j.Id);
-                
-                // Add indices matching schema.prisma
+                // Indices matching the original Prisma schema for query performance
                 entity.HasIndex(j => j.IsActive);
                 entity.HasIndex(j => new { j.IsActive, j.Category });
                 entity.HasIndex(j => new { j.RecruiterId, j.CreatedAt });
@@ -107,11 +104,9 @@ namespace JobFinder.Api.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Application configuration
+            // ── Application ────────────────────────────────────────────────────────────
             modelBuilder.Entity<Application>(entity =>
             {
-                entity.HasKey(a => a.Id);
-
                 // Enforce one application per job per seeker at the DB level
                 entity.HasIndex(a => new { a.JobId, a.JobSeekerId }).IsUnique();
 
@@ -126,10 +121,9 @@ namespace JobFinder.Api.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // SavedJob configuration
+            // ── SavedJob ───────────────────────────────────────────────────────────────
             modelBuilder.Entity<SavedJob>(entity =>
             {
-                entity.HasKey(sj => sj.Id);
                 entity.HasIndex(sj => new { sj.JobId, sj.JobSeekerId }).IsUnique();
 
                 entity.HasOne(sj => sj.Job)
@@ -143,62 +137,36 @@ namespace JobFinder.Api.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Notification configuration
+            // ── Notification ───────────────────────────────────────────────────────────
             modelBuilder.Entity<Notification>(entity =>
             {
-                entity.HasKey(n => n.Id);
-
                 entity.HasOne(n => n.User)
                     .WithMany(u => u.Notifications)
                     .HasForeignKey(n => n.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // Report configuration
+            // ── Report ─────────────────────────────────────────────────────────────────
             modelBuilder.Entity<Report>(entity =>
             {
-                entity.HasKey(r => r.Id);
-
-                // Reporter (User)
+                // Reporter (required User)
                 entity.HasOne(r => r.Reporter)
                     .WithMany(u => u.ReportsMade)
                     .HasForeignKey(r => r.ReporterId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // Reported User (User? - optional)
+                // Reported User (optional)
                 entity.HasOne(r => r.ReportedUser)
                     .WithMany(u => u.ReportsReceived)
                     .HasForeignKey(r => r.ReportedUserId)
                     .OnDelete(DeleteBehavior.SetNull);
 
-                // Reported Job (Job? - optional)
+                // Reported Job (optional)
                 entity.HasOne(r => r.ReportedJob)
                     .WithMany(j => j.Reports)
                     .HasForeignKey(r => r.ReportedJobId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
-
-            // ── Prisma-compatible naming convention ──────────────────────────────────
-            // Prisma for PostgreSQL uses:
-            //   - Table names: singular PascalCase  (e.g. "User", "JobSeekerProfile")
-            //   - Column names: camelCase           (e.g. "isActive", "createdAt")
-            // EF Core defaults to plural DbSet names for tables and PascalCase for columns,
-            // so we apply the convention manually here instead of using an external package.
-            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-            {
-                // Table name = C# class name (singular PascalCase)
-                entityType.SetTableName(entityType.ClrType.Name);
-
-                // Column names: PascalCase → camelCase (first letter lowercase)
-                foreach (var property in entityType.GetProperties())
-                {
-                    var col = property.GetColumnName();
-                    if (!string.IsNullOrEmpty(col) && char.IsUpper(col[0]))
-                    {
-                        property.SetColumnName(char.ToLower(col[0]) + col[1..]);
-                    }
-                }
-            }
         }
     }
 }

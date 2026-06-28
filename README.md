@@ -1,13 +1,13 @@
-# Job Finder — .NET 8 C# Backend
+# Job Finder — .NET 9 C# Backend
 
-A production-ready ASP.NET Core 8 Web API that is a **drop-in replacement** for the Node.js backend. It connects to the same React frontend with zero frontend configuration changes.
+A production-ready ASP.NET Core 9 Web API that is a **drop-in replacement** for the Node.js backend. It connects to the same React frontend with zero frontend configuration changes.
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
-| Runtime | .NET 8 / ASP.NET Core |
-| Database | PostgreSQL 16 via Npgsql + EF Core 8 |
+| Runtime | .NET 9 / ASP.NET Core |
+| Database | PostgreSQL 16 via Npgsql + EF Core 9 |
 | Queue | Redis 7 + Custom `IHostedService` worker |
 | Auth | JWT (HMAC-SHA256) via HTTP-only cookies |
 | Validation | FluentValidation 11 |
@@ -16,73 +16,128 @@ A production-ready ASP.NET Core 8 Web API that is a **drop-in replacement** for 
 ## Architecture
 
 ```
-job-finder-react (port 3000)
-    └── Vite proxy /api → localhost:5002
-            └── job-finder-backend-csharp (port 5002)
+┌─────────────────────────────────────────────────────────────┐
+│                    job-finder-react                         │
+│                                                             │
+│  Mode A: Vite dev server (port 3000)                        │
+│          └── proxy /api → http://localhost:5002             │
+│                                                             │
+│  Mode B/C: nginx Docker (port 8080)                         │
+│          └── proxy /api → $BACKEND_HOST                     │
+│               ├── Docker mode:  http://backend:5002         │
+│               └── Hybrid mode:  http://host.docker.internal:5002
+└─────────────────────────────────────────────────────────────┘
+                           │
+              job-finder-backend-csharp (port 5002)
                     ├── PostgreSQL (port 5432)
                     └── Redis (port 6379)
                             └── QueueWorker (IHostedService)
 ```
 
-## Running with Docker (recommended)
+## Running Modes
 
 > ⚠️ **Only one backend should run at a time.** Both the Node.js and C# stacks use the same ports and Docker network.
 
-### 1. Create the shared Docker network (once, shared with Node.js stack)
+---
+
+### 🐳 Mode A — Full Docker (everything in containers)
+
+All services — backend, PostgreSQL, Redis — run as Docker containers. The React frontend is served by nginx (also in Docker) and proxies API calls to the backend container over the shared Docker network.
+
+**Step 1 — Create the shared Docker network (once)**
 
 ```bash
 docker network create job-finder-network
 ```
 
-### 2. Stop the Node.js backend if running
+**Step 2 — Stop the Node.js backend if running**
 
 ```bash
-# In the job-finder-backend-node directory:
+# In job-finder-backend-node:
 docker compose down
 ```
 
-### 3. Start the C# backend
+**Step 3 — Start the C# backend**
 
 ```bash
 # In this directory:
-docker compose up --build
+docker compose up --build -d
 ```
 
-### 4. Seed the database (first run only)
+**Step 4 — Start the React frontend**
+
+```bash
+# In job-finder-react:
+docker compose up --build -d
+# Open http://localhost:8080
+```
+
+**Step 5 — Seed the database (first run only)**
 
 ```bash
 docker compose exec backend dotnet JobFinder.Api.dll --seed
 ```
 
-This creates demo users:
+Demo accounts created by seeding:
 | Email | Password | Role |
 |-------|----------|------|
 | `admin@example1.com` | `admin` | ADMIN |
 | `recruiter@example.com` | `recruiter123` | RECRUITER |
 | `seeker@example.com` | `seeker123` | JOB_SEEKER |
 
+---
 
-The React frontend (`job-finder-react`) can now be started without any changes:
+### 💻 Mode B — Local Dev (`dotnet run` + Vite dev server)
 
-```bash
-# In job-finder-react:
-npm run dev
-```
+Best for active development. The backend runs natively for fast iteration; only PostgreSQL and Redis run in Docker. The Vite dev server handles the frontend with HMR.
 
-## Running Locally (without Docker)
+> **Why set env vars?**
+> The `.env` file uses Docker container hostnames (`job-finder-db-csharp`, `job-finder-redis-csharp`) that only resolve inside the Docker network. Shell env vars take priority over `.env`, so setting them to `localhost` overrides the Docker hostnames.
 
-Requires a running PostgreSQL on port `5432` and Redis on port `6379`.
+```powershell
+# Step 1 — start only DB + Redis
+docker compose up postgres redis -d
 
-```bash
-cd src/JobFinder.Api
+# Step 2 — run the backend natively (PowerShell)
+cd src\JobFinder.Api
+$env:DATABASE_URL="Host=localhost;Port=5432;Database=job_finder;Username=job_finder_user;Password=secure_password_123"
+$env:REDIS_URL="localhost:6379"
+$env:ASPNETCORE_ENVIRONMENT="Development"
 dotnet run
+
+# Step 3 — start Vite dev server (in job-finder-react)
+npm run dev
+# Open http://localhost:3000
 ```
 
-To seed locally:
+Expected backend output:
+```
+✅ Database schema initialized successfully.
+🚀 Server is running on port 5002 in Development mode.
+```
 
-```bash
+To seed the database locally:
+```powershell
 dotnet run -- --seed
 ```
+
+---
+
+### 🔀 Mode C — Hybrid (native backend + nginx Docker frontend)
+
+Useful when you want the nginx/production frontend container but are running the backend natively (e.g. debugging).
+
+```powershell
+# Step 1 — run the backend natively (same as Mode B steps 1–2)
+
+# Step 2 — start the React nginx container pointing at the host machine
+cd i:\path\to\job-finder-react
+$env:BACKEND_HOST="http://host.docker.internal:5002"
+docker compose up --build -d
+# Open http://localhost:8080
+```
+
+> `host.docker.internal` is Docker's special DNS name that resolves to your Windows/Mac host from inside a container. The `docker-compose.yml` already adds the required `extra_hosts` entry for Linux Docker hosts.
 
 ## API Endpoints
 
