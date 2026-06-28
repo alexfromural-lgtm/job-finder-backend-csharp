@@ -34,11 +34,13 @@ namespace JobFinder.Api.Middleware
                 return Task.CompletedTask;
             }
 
-            // 2. Check roles by directly reading the "roles" claim values.
-            // We avoid user.IsInRole() because JwtSecurityTokenHandler can remap
-            // custom claim names to full URI equivalents during token validation,
-            // causing IsInRole() to silently fail even when the claim is present.
-            var userRoles = user.FindAll("roles").Select(c => c.Value).ToHashSet();
+            // 2. Check roles by reading any matching "roles", "role", or standard ClaimTypes.Role claims.
+            // This ensures compatibility with both standard and custom mapped claims.
+            var userRoles = user.FindAll("roles")
+                                .Concat(user.FindAll("role"))
+                                .Concat(user.FindAll(ClaimTypes.Role))
+                                .Select(c => c.Value)
+                                .ToHashSet();
             var hasRole = _roles.Any(role => userRoles.Contains(role));
             if (!hasRole)
             {
