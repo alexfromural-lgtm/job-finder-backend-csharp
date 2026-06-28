@@ -1,0 +1,296 @@
+### Job Finder C# Backend — REST API Tests
+### Use with VS Code REST Client extension or JetBrains HTTP Client
+
+@baseUrl = http://localhost:5002
+@contentType = application/json
+
+# ─── VARIABLES (fill after login) ─────────────────────────────────────────────
+@jobSeekerId = <fill after GET /jobseeker/profile>
+@recruiterId = <fill after GET /recruiter/profile>
+@jobId       = <fill after POST /jobs>
+@applicationId = <fill after GET /jobseeker/applications>
+@queueJobId  = <fill from 202 response>
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTH
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 1. Signup — Job Seeker
+POST {{baseUrl}}/api/auth/signup/jobseeker
+Content-Type: {{contentType}}
+
+{
+  "name": "Test Seeker",
+  "email": "seeker@test.com",
+  "password": "password123"
+}
+
+###
+
+### 2. Signup — Recruiter
+POST {{baseUrl}}/api/auth/signup/recruiter
+Content-Type: {{contentType}}
+
+{
+  "name": "Test Recruiter",
+  "email": "recruiter@test.com",
+  "password": "password123",
+  "companyName": "Acme Corp",
+  "industry": "Software",
+  "companyWebsite": "https://acme.com",
+  "description": "A great place to work"
+}
+
+###
+
+### 3. Login — Job Seeker
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "seeker@test.com",
+  "password": "password123"
+}
+
+###
+
+### 4. Login — Recruiter
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "recruiter@test.com",
+  "password": "password123"
+}
+
+###
+
+### 5. Get Current User (requires accessToken cookie)
+GET {{baseUrl}}/api/auth/me
+
+###
+
+### 6. Refresh Tokens (requires refreshToken cookie)
+POST {{baseUrl}}/api/auth/refresh
+
+###
+
+### 7. Upgrade Job Seeker to Recruiter (requires JOB_SEEKER cookie)
+POST {{baseUrl}}/api/auth/upgrade
+Content-Type: {{contentType}}
+
+{
+  "companyName": "My New Company",
+  "industry": "Tech",
+  "companyWebsite": "https://mynewcompany.com",
+  "description": "Startup building cool things"
+}
+
+###
+
+### 8. Logout
+POST {{baseUrl}}/api/auth/logout
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOBS (public + recruiter)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 9. List All Jobs (public)
+GET {{baseUrl}}/api/jobs/all
+
+###
+
+### 10. List Jobs — with filters
+GET {{baseUrl}}/api/jobs/all?category=Software&location=remote&search=react&page=1&pageSize=10
+
+###
+
+### 11. Create Job (requires RECRUITER cookie)
+POST {{baseUrl}}/api/jobs
+Content-Type: {{contentType}}
+
+{
+  "title": "Senior React Developer",
+  "description": "Build amazing UIs",
+  "requirements": "5+ years React, TypeScript expertise",
+  "location": "Remote",
+  "salaryRange": "$120,000 - $160,000",
+  "category": "Software"
+}
+
+###
+
+### 12. Get Job by ID
+GET {{baseUrl}}/api/jobs/{{jobId}}
+
+###
+
+### 13. Update Job (requires RECRUITER cookie)
+PATCH {{baseUrl}}/api/jobs/{{jobId}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Lead React Developer",
+  "description": "Build amazing UIs at scale",
+  "requirements": "7+ years React, TypeScript and team lead experience",
+  "location": "Remote",
+  "salaryRange": "$140,000 - $180,000",
+  "category": "Software"
+}
+
+###
+
+### 14. Get My Jobs (requires RECRUITER cookie)
+GET {{baseUrl}}/api/jobs/recruiter
+
+###
+
+### 15. Delete Job (requires RECRUITER cookie)
+DELETE {{baseUrl}}/api/jobs/{{jobId}}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JOB SEEKER
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 16. Get Job Seeker Profile (requires JOB_SEEKER cookie)
+GET {{baseUrl}}/api/jobseeker/profile
+
+###
+
+### 17. Update Job Seeker Profile (requires JOB_SEEKER cookie)
+PATCH {{baseUrl}}/api/jobseeker/profile
+Content-Type: {{contentType}}
+
+{
+  "bio": "Passionate full-stack developer",
+  "location": "Sydney, Australia",
+  "skills": ["React", "TypeScript", "Node.js", "C#"],
+  "education": "BSc Computer Science",
+  "experience": "5 years at Acme Corp",
+  "resumeUrl": "https://example.com/my-resume.pdf"
+}
+
+###
+
+### 18. Apply to Job — enqueued (requires JOB_SEEKER cookie) → 202 Accepted
+POST {{baseUrl}}/api/jobseeker/apply/{{jobId}}
+Content-Type: {{contentType}}
+
+{
+  "coverLetter": "I am very excited about this opportunity!"
+}
+
+###
+
+### 19. Poll queue status for Apply job (replace queueJobId from 202 response)
+GET {{baseUrl}}/api/queue/job/{{queueJobId}}
+
+###
+
+### 20. Get My Applications (requires JOB_SEEKER cookie)
+GET {{baseUrl}}/api/jobseeker/applications
+
+###
+
+### 21. Withdraw Application (requires JOB_SEEKER cookie)
+DELETE {{baseUrl}}/api/jobseeker/applications/{{applicationId}}
+
+###
+
+### 22. Save Job — enqueued (requires JOB_SEEKER cookie) → 202 Accepted
+POST {{baseUrl}}/api/jobseeker/save/{{jobId}}
+
+###
+
+### 23. Get Saved Jobs (requires JOB_SEEKER cookie)
+GET {{baseUrl}}/api/jobseeker/saved
+
+###
+
+### 24. Unsave Job (requires JOB_SEEKER cookie)
+DELETE {{baseUrl}}/api/jobseeker/saved/{{jobId}}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RECRUITER
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 25. Get Recruiter Profile (requires RECRUITER cookie)
+GET {{baseUrl}}/api/recruiter/profile
+
+###
+
+### 26. Update Recruiter Profile (requires RECRUITER cookie)
+PATCH {{baseUrl}}/api/recruiter/profile
+Content-Type: {{contentType}}
+
+{
+  "companyName": "Acme Corp Updated",
+  "companyWebsite": "https://acme-updated.com",
+  "description": "We build the future",
+  "industry": "AI / ML"
+}
+
+###
+
+### 27. Get Applications for a Job (requires RECRUITER cookie)
+GET {{baseUrl}}/api/recruiter/jobs/{{jobId}}/applications
+
+###
+
+### 28. Update Application Status (requires RECRUITER cookie)
+PATCH {{baseUrl}}/api/recruiter/applications/{{applicationId}}/status
+Content-Type: {{contentType}}
+
+{
+  "status": "shortlisted"
+}
+
+###
+
+### 29. Update Application Status — rejected
+PATCH {{baseUrl}}/api/recruiter/applications/{{applicationId}}/status
+Content-Type: {{contentType}}
+
+{
+  "status": "rejected"
+}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VALIDATION ERROR CASES
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 30. Signup with weak password → 400
+POST {{baseUrl}}/api/auth/signup/jobseeker
+Content-Type: {{contentType}}
+
+{
+  "name": "Bad User",
+  "email": "bad@test.com",
+  "password": "123"
+}
+
+###
+
+### 31. Login with wrong password → 401
+POST {{baseUrl}}/api/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "seeker@test.com",
+  "password": "wrongpassword"
+}
+
+###
+
+### 32. Access protected endpoint without cookie → 401
+GET {{baseUrl}}/api/jobseeker/profile
+
+###
+
+### 33. Access recruiter endpoint as job seeker → 403
+GET {{baseUrl}}/api/recruiter/profile

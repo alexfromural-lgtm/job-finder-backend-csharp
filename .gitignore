@@ -1,0 +1,26 @@
+## .NET Core
+bin/
+obj/
+*.user
+.vs/
+*.suo
+*.userprefs
+
+## Environment files (never commit secrets)
+.env
+!.env.sample
+
+## Build outputs
+publish/
+out/
+
+## EF Core migrations (commit migrations, not the generated SQL scripts)
+# src/JobFinder.Api/Migrations/
+
+## Logs
+*.log
+logs/
+
+## OS files
+.DS_Store
+Thumbs.db

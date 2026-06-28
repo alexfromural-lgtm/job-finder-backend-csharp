@@ -1,0 +1,97 @@
+
+services:
+  # ── .NET C# API Backend ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-finder-backend
+    restart: unless-stopped
+    ports:
+      - "5002:5002"             # Same as Node.js backend — Vite proxy targets localhost:5002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      PORT: ${PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      ACCESS_TOKEN_EXPIRES_IN_MINUTES: ${ACCESS_TOKEN_EXPIRES_IN_MINUTES}
+      REFRESH_TOKEN_EXPIRES_IN_DAYS: ${REFRESH_TOKEN_EXPIRES_IN_DAYS}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY}
+    networks:
+      - job-network
+
+  # ── PostgreSQL Database ───────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: job-finder-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"             # Same as Node.js backend
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - job-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── pgAdmin ───────────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: job-finder-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"               # Same as Node.js backend
+    env_file:
+      - .env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    depends_on:
+      - postgres
+    networks:
+      - job-network
+
+  # ── Redis Message Queue ────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: job-finder-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"             # Same as Node.js backend
+    networks:
+      - job-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+# Use the same shared external network name as the Node.js stack.
+# Only one backend stack should be running at a time.
+networks:
+  job-network:
+    external: true
+    name: job-finder-network
+
+volumes:
+  pgdata:
