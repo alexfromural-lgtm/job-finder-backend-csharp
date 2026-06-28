@@ -49,7 +49,7 @@ namespace JobFinder.Api.Controllers
             return Ok(new { job });
         }
 
-        [HttpPatch("{jobId}")]
+        [HttpPut("{jobId}")]
         [AuthorizeRoles(Role.RECRUITER)]
         public async Task<IActionResult> UpdateJob(string jobId, [FromBody] JobCreateUpdateDto dto)
         {

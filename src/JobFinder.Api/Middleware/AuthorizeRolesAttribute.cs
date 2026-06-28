@@ -34,11 +34,15 @@ namespace JobFinder.Api.Middleware
                 return Task.CompletedTask;
             }
 
-            // 2. Check roles
-            var hasRole = _roles.Any(role => user.IsInRole(role));
+            // 2. Check roles by directly reading the "roles" claim values.
+            // We avoid user.IsInRole() because JwtSecurityTokenHandler can remap
+            // custom claim names to full URI equivalents during token validation,
+            // causing IsInRole() to silently fail even when the claim is present.
+            var userRoles = user.FindAll("roles").Select(c => c.Value).ToHashSet();
+            var hasRole = _roles.Any(role => userRoles.Contains(role));
             if (!hasRole)
             {
-                context.Result = new JsonResult(new { message = "Access denied." })
+                context.Result = new JsonResult(new { error = "Access denied." })
                 {
                     StatusCode = 403
                 };

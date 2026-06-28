@@ -1,8 +1,13 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,7 +115,57 @@ namespace JobFinder.Api
                 });
             });
 
-            builder.Services.AddControllers();
+            // 8b. JSON: camelCase property names + omit nulls — matches Node.js natural JS casing.
+            // Without this, C# defaults to PascalCase (e.g. "Roles" instead of "roles"),
+            // which breaks the React frontend's role detection and hides nav bar items.
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                    // Serialize enums as strings ("JOB_SEEKER") not integers (0)
+                    // Required so the React frontend's hasRole('JOB_SEEKER') check works correctly
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                });
+
+            // 9. Response compression (gzip) — mirrors Node.js `compression` middleware in prod
+            builder.Services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.Providers.Add<GzipCompressionProvider>();
+            });
+
+            // 10. Rate limiting — mirrors Node.js express-rate-limit config:
+            //   - auth-limiter:   10 requests per 15 minutes (login, refresh)
+            //   - signup-limiter:  5 requests per 60 minutes (signup endpoints)
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = 429;
+
+                options.AddFixedWindowLimiter("auth-limiter", cfg =>
+                {
+                    cfg.PermitLimit = 10;
+                    cfg.Window = TimeSpan.FromMinutes(15);
+                    cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    cfg.QueueLimit = 0;
+                });
+
+                options.AddFixedWindowLimiter("signup-limiter", cfg =>
+                {
+                    cfg.PermitLimit = 5;
+                    cfg.Window = TimeSpan.FromHours(1);
+                    cfg.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    cfg.QueueLimit = 0;
+                });
+
+                // Custom rejection response body: { "error": "Too many attempts..." }
+                options.OnRejected = async (ctx, _) =>
+                {
+                    ctx.HttpContext.Response.ContentType = "application/json";
+                    await ctx.HttpContext.Response.WriteAsync(
+                        "{\"error\":\"Too many attempts, please try again later.\"}");
+                };
+            });
 
             var app = builder.Build();
 
@@ -141,6 +196,20 @@ namespace JobFinder.Api
             // 11. Middlewares setup
             app.UseMiddleware<ErrorHandlerMiddleware>();
             app.UseCors("CorsPolicy");
+            app.UseResponseCompression();
+            app.UseRateLimiter();
+
+            // Security headers — mirrors Node.js helmet middleware
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                context.Response.Headers["X-Frame-Options"] = "DENY";
+                context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+                context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+                context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+                await next();
+            });
+
             app.UseMiddleware<AuthMiddleware>();
             app.MapControllers();
 

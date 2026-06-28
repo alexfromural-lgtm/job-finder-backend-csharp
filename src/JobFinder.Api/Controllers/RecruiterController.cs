@@ -9,7 +9,7 @@ using JobFinder.Api.Services;
 namespace JobFinder.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/recruiter")]
     [AuthorizeRoles(Role.RECRUITER)]
     public class RecruiterController : ControllerBase
     {

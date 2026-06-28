@@ -7,7 +7,7 @@ using JobFinder.Api.Queue.Models;
 namespace JobFinder.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/queue")]
     public class QueueController : ControllerBase
     {
         private readonly IRedisQueue _redisQueue;

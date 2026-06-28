@@ -80,7 +80,7 @@ namespace JobFinder.Api.Controllers
             });
         }
 
-        [HttpPost("save/{jobId}")]
+        [HttpPost("saved/{jobId}")]
         public async Task<IActionResult> SaveJob(string jobId)
         {
             var userId = User.FindFirst("userId")!.Value;

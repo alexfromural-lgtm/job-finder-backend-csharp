@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FluentValidation;
 using JobFinder.Api.Common.Models;
 using JobFinder.Api.Config;
@@ -12,7 +13,7 @@ using JobFinder.Api.Services;
 namespace JobFinder.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/auth")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
@@ -39,6 +40,7 @@ namespace JobFinder.Api.Controllers
         }
 
         [HttpPost("signup/jobseeker")]
+        [EnableRateLimiting("signup-limiter")]
         public async Task<IActionResult> SignupJobSeeker([FromBody] JobSeekerSignupDto dto)
         {
             var validation = await _jobSeekerSignupValidator.ValidateAsync(dto);
@@ -49,10 +51,11 @@ namespace JobFinder.Api.Controllers
 
             var tokens = await _authService.SignupJobSeekerAsync(dto);
             SetTokenCookies(tokens);
-            return Ok(tokens);
+            return StatusCode(201, new { message = "Signed up successfully" });
         }
 
         [HttpPost("signup/recruiter")]
+        [EnableRateLimiting("signup-limiter")]
         public async Task<IActionResult> SignupRecruiter([FromBody] RecruiterSignupDto dto)
         {
             var validation = await _recruiterSignupValidator.ValidateAsync(dto);
@@ -63,10 +66,11 @@ namespace JobFinder.Api.Controllers
 
             var tokens = await _authService.SignupRecruiterAsync(dto);
             SetTokenCookies(tokens);
-            return Ok(tokens);
+            return StatusCode(201, new { message = "Signed up successfully" });
         }
 
-        [HttpPost("upgrade")]
+        // Matches Node.js route: POST /api/auth/upgrade/recruiter
+        [HttpPost("upgrade/recruiter")]
         [AuthorizeRoles(Role.JOB_SEEKER)]
         public async Task<IActionResult> UpgradeToRecruiter([FromBody] RecruiterUpgradeDto dto)
         {
@@ -89,6 +93,7 @@ namespace JobFinder.Api.Controllers
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("auth-limiter")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var validation = await _loginValidator.ValidateAsync(dto);
@@ -99,7 +104,7 @@ namespace JobFinder.Api.Controllers
 
             var tokens = await _authService.LoginAsync(dto);
             SetTokenCookies(tokens);
-            return Ok(tokens);
+            return Ok(new { message = "Logged in successfully" });
         }
 
         [HttpPost("logout")]
@@ -110,6 +115,7 @@ namespace JobFinder.Api.Controllers
         }
 
         [HttpPost("refresh")]
+        [EnableRateLimiting("auth-limiter")]
         public async Task<IActionResult> Refresh()
         {
             if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken) || string.IsNullOrEmpty(refreshToken))
@@ -119,7 +125,7 @@ namespace JobFinder.Api.Controllers
 
             var tokens = await _authService.RefreshTokensAsync(refreshToken);
             SetTokenCookies(tokens);
-            return Ok(tokens);
+            return Ok(new { message = "Token refreshed" });
         }
 
         [HttpGet("me")]

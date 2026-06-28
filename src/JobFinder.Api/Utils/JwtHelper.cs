@@ -87,7 +87,7 @@ namespace JobFinder.Api.Utils
                     ValidateIssuer = false,
                     ValidateAudience = false,
                     RoleClaimType = "roles",
-                    ClockSkew = TimeSpan.Zero // Immediate expiration check
+                    ClockSkew = TimeSpan.FromSeconds(30) // Small tolerance for clock drift
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out SecurityToken validatedToken);
