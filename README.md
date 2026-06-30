@@ -217,3 +217,8 @@ cp .env.sample .env
 | `REFRESH_TOKEN_EXPIRES_IN_DAYS` | Refresh token TTL in days |
 | `CORS_ORIGIN` | Allowed CORS origin |
 | `QUEUE_CONCURRENCY` | Worker concurrency (default: `5`) |
+
+## 🔗 Frontend
+
+The React frontend lives at [`https://github.com/alexfromural-lgtm/job-finder-react`](https://github.com/alexfromural-lgtm/job-finder-react) and proxies all `/api` calls to this service on port **5002**.
+
